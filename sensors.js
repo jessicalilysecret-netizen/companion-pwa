@@ -76,9 +76,12 @@ const Sensors = (() => {
       const flatness = Math.exp(logSum / n) / (linSum / n + 1e-12);
       const lowRatio = lowSum / (linSum + 1e-12);
 
-      // 阈值:灵敏度滑杆只调 RMS 门限;平坦度/低频是"像不像风"的判据,固定
-      const rmsGate = 0.035 * (11 - sensitivity) / 5;   // sens=5 → 0.042
-      const isBlow = rms > rmsGate && flatness > 0.12 && lowRatio > 0.55;
+      // 阈值:灵敏度滑杆调 RMS 门限;平坦度/低频是"像不像风"的判据。
+      // 真机麦克风(尤其手机)风噪没那么"平",门槛放宽,并改为"两条风判据满足其一即可",
+      // 靠 RMS 门限 + 时长门限(下面 dur>120)一起把说话挡掉。
+      const rmsGate = 0.022 * (11 - sensitivity) / 5;   // sens=5 → 0.026
+      const windLike = flatness > 0.06 || lowRatio > 0.42;
+      const isBlow = rms > rmsGate && windLike;
       const now = performance.now();
 
       if (isBlow) {
@@ -93,7 +96,7 @@ const Sensors = (() => {
         blowActive = false;
         const dur = blowLastEnd - blowStartT;
         if (dur > 120) { // 太短促的(拍麦/爆破音)丢弃
-          const strength = Math.min(1, blowPeak / 0.25);
+          const strength = Math.min(1, blowPeak / 0.10);
           emit({ event: "user_blowing", strength: +strength.toFixed(2) });
         }
       }

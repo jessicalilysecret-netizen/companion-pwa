@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#faf7f2" id="meta-theme">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Companion</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- 顶栏 -->
+  <header id="topbar">
+    <div id="title-area">
+      <span id="app-title">Companion</span>
+      <span id="conn-dot" title="网络状态"></span>
+    </div>
+    <div id="topbar-btns">
+      <button id="btn-sensors" class="icon-btn" title="传感器">📡</button>
+      <button id="btn-settings" class="icon-btn" title="设置">⚙️</button>
+    </div>
+  </header>
+
+  <!-- 离线提示 -->
+  <div id="offline-banner" hidden>离线中——恢复网络后可继续对话</div>
+
+  <!-- 聊天流 -->
+  <main id="chat"></main>
+
+  <!-- 输入区 -->
+  <footer id="composer">
+    <textarea id="input" rows="1" placeholder="说点什么…" enterkeyhint="send"></textarea>
+    <button id="btn-send" disabled>↑</button>
+  </footer>
+
+  <!-- 传感器面板 -->
+  <div id="sensor-panel" class="sheet" hidden>
+    <div class="sheet-head"><b>体感</b><button class="icon-btn sheet-close">✕</button></div>
+    <label class="row"><span>全局静默(不发送任何体感事件)</span><input type="checkbox" id="s-mute"></label>
+    <hr>
+    <label class="row"><span>🌬️ 吹气(需要麦克风)</span><input type="checkbox" id="s-blow"></label>
+    <div class="sub-row" id="blow-sense-row">
+      <span>吹气灵敏度</span>
+      <input type="range" id="s-blow-sense" min="1" max="10" value="5">
+    </div>
+    <label class="row"><span>📳 摇晃</span><input type="checkbox" id="s-shake"></label>
+    <label class="row"><span>🔄 旋转</span><input type="checkbox" id="s-rotate"></label>
+    <button id="btn-motion-perm" class="wide-btn" hidden>iOS:点此授权运动传感器</button>
+    <p class="hint">传感器数据全部在本机分析,只有触发的离散事件(如"吹气 0.78")会作为消息进入对话。麦克风音频不录制、不上传。</p>
+    <div id="sensor-live" class="hint"></div>
+  </div>
+
+  <!-- 设置面板 -->
+  <div id="settings-panel" class="sheet" hidden>
+    <div class="sheet-head"><b>设置</b><button class="icon-btn sheet-close">✕</button></div>
+
+    <h4>连接</h4>
+    <label class="col">API Key(只存在本机浏览器里)
+      <input type="password" id="set-key" placeholder="sk-ant-…" autocomplete="off">
+    </label>
+    <label class="col">Model
+      <input type="text" id="set-model" placeholder="claude-sonnet-5" list="model-list">
+      <datalist id="model-list">
+        <option value="claude-sonnet-5"></option>
+        <option value="claude-opus-5"></option>
+        <option value="claude-haiku-4-5"></option>
+      </datalist>
+    </label>
+    <label class="col">携带最近对话轮数
+      <input type="number" id="set-history" min="2" max="200" value="30">
+    </label>
+
+    <h4>Persona</h4>
+    <div class="row-btns">
+      <button id="btn-persona-file" class="small-btn">导入文件(.md/.txt)</button>
+      <button id="btn-persona-paste" class="small-btn">粘贴文本</button>
+      <button id="btn-persona-view" class="small-btn">查看</button>
+      <button id="btn-persona-clear" class="small-btn danger">清除</button>
+    </div>
+    <input type="file" id="persona-file" accept=".md,.txt,text/plain,text/markdown" hidden>
+    <div id="persona-status" class="hint"></div>
+
+    <h4>聊天记录</h4>
+    <div class="row-btns">
+      <button id="btn-export-json" class="small-btn">导出 JSON</button>
+      <button id="btn-export-md" class="small-btn">导出 Markdown</button>
+      <button id="btn-clear-chat" class="small-btn danger">清空记录</button>
+    </div>
+
+    <h4>外观</h4>
+    <div class="row-btns">
+      <button class="small-btn theme-btn" data-theme="light">浅色</button>
+      <button class="small-btn theme-btn" data-theme="dark">深色</button>
+      <button class="small-btn theme-btn" data-theme="tint">柔彩</button>
+    </div>
+    <label class="col" id="tint-row">柔彩主色
+      <input type="color" id="set-tint" value="#e8a0a8">
+    </label>
+
+    <p class="hint">API Key 与 persona 仅存于此设备(localStorage / IndexedDB),只随请求发送给 Anthropic API,不经过任何其他服务器。</p>
+  </div>
+
+  <div id="sheet-mask" hidden></div>
+</div>
+
+<script src="db.js"></script>
+<script src="api.js"></script>
+<script src="sensors.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

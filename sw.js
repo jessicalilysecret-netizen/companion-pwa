@@ -1,7 +1,7 @@
 /* sw.js — 静态资源离线缓存。API 请求(api.anthropic.com)永不缓存。 */
 "use strict";
 
-const CACHE = "companion-v2";
+const CACHE = "companion-v3";
 const ASSETS = [
   "./", "./index.html", "./style.css",
   "./db.js", "./api.js", "./sensors.js", "./app.js",

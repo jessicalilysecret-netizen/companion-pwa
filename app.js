@@ -15,7 +15,8 @@
     user_flipping: () => "🙃 翻转",
   };
 
-  let busy = false; // 一次只跑一个请求
+  let busy = false;         // 一次只跑一个请求
+  let pendingImage = null;  // 待发送图片的 dataURL(已压缩),或 null
 
   // ---------- 渲染 ----------
   function render(msg) {
@@ -36,7 +37,17 @@
     } else {
       div.className = "msg " + (msg.role === "user" ? "me" : "ai");
       div.innerHTML = `<div class="bubble"></div>`;
-      div.firstChild.textContent = msg.content;
+      const bub = div.firstChild;
+      if (msg.image) {
+        const im = document.createElement("img");
+        im.src = msg.image;
+        bub.appendChild(im);
+      }
+      if (msg.content) {
+        const span = document.createElement("span");
+        span.textContent = msg.content;
+        bub.appendChild(span);
+      }
     }
     chatEl.appendChild(div);
     chatEl.scrollTop = chatEl.scrollHeight;
@@ -48,30 +59,43 @@
   }
 
   // ---------- 发送 ----------
+  // 把一条存储消息转成 Anthropic content blocks 数组
+  function msgToBlocks(m) {
+    const blocks = [];
+    if (m.image) {
+      const comma = m.image.indexOf(",");
+      const media = (m.image.match(/data:(.*?);/) || [])[1] || "image/jpeg";
+      blocks.push({ type: "image", source: { type: "base64", media_type: media, data: m.image.slice(comma + 1) } });
+    }
+    if (m.content) blocks.push({ type: "text", text: m.content });
+    if (!blocks.length) blocks.push({ type: "text", text: "(空)" });
+    return blocks;
+  }
+
   async function buildRequestMessages() {
     const maxTurns = CFG.get("history", 30);
     const all = (await DB.allMessages()).filter(m => m.kind !== "error");
-    // 简单截断:保留最近 N 条(user+assistant 合计),并保证以 user 开头
-    let msgs = all.slice(-maxTurns * 2).map(m => ({ role: m.role, content: m.content }));
+    let msgs = all.slice(-maxTurns * 2);
     while (msgs.length && msgs[0].role !== "user") msgs.shift();
-    // 合并相邻同角色消息(连续传感器事件 + 文字会产生连续 user)
+    // 合并相邻同角色消息;content 统一为 blocks 数组(API 接受)
     const merged = [];
     for (const m of msgs) {
+      const blocks = msgToBlocks(m);
       const last = merged[merged.length - 1];
-      if (last && last.role === m.role) last.content += "\n" + m.content;
-      else merged.push({ ...m });
+      if (last && last.role === m.role) last.content.push(...blocks);
+      else merged.push({ role: m.role, content: blocks });
     }
     return merged;
   }
 
-  async function send(content, kind) {
+  async function send(content, kind, image) {
     const apiKey = CFG.get("key", "");
     if (!apiKey) {
       render({ kind: "error", content: "先在 ⚙️ 设置里填 API Key" });
       openSheet("#settings-panel");
       return;
     }
-    const userMsg = { role: "user", content, kind, ts: Date.now() };
+    const userMsg = { role: "user", content, kind, image: image || null, ts: Date.now() };
     await DB.addMessage(userMsg);
     render(userMsg);
 
@@ -115,11 +139,56 @@
 
   sendBtn.addEventListener("click", () => {
     const t = inputEl.value.trim();
-    if (!t) return;
+    const img = pendingImage;
+    if (!t && !img) return;
     inputEl.value = "";
+    clearPendingImage();
     autoGrow();
-    send(t, "text");
+    send(t, img ? "image" : "text", img);
   });
+
+  // ---- 图片:选取 → 本机压缩 → 预览 → 发送 ----
+  function resizeImage(file, maxDim = 1024, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let w = img.naturalWidth, h = img.naturalHeight;
+        const scale = Math.min(1, maxDim / Math.max(w, h));
+        w = Math.max(1, Math.round(w * scale));
+        h = Math.max(1, Math.round(h * scale));
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        c.getContext("2d").drawImage(img, 0, 0, w, h);
+        try { resolve(c.toDataURL("image/jpeg", quality)); }
+        catch (e) { reject(e); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("这张图读不出来(格式可能不支持)")); };
+      img.src = url;
+    });
+  }
+  function clearPendingImage() {
+    pendingImage = null;
+    $("#pending-image").hidden = true;
+    $("#pending-thumb").removeAttribute("src");
+    autoGrow();
+  }
+  $("#btn-image").addEventListener("click", () => $("#image-file").click());
+  $("#image-file").addEventListener("change", async e => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    try {
+      pendingImage = await resizeImage(f);
+      $("#pending-thumb").src = pendingImage;
+      $("#pending-image").hidden = false;
+      autoGrow();
+    } catch (err) {
+      render({ kind: "error", content: "图片处理失败:" + err.message });
+    }
+  });
+  $("#btn-cancel-image").addEventListener("click", clearPendingImage);
   inputEl.addEventListener("keydown", e => {
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
@@ -129,7 +198,7 @@
   function autoGrow() {
     inputEl.style.height = "auto";
     inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
-    sendBtn.disabled = !inputEl.value.trim();
+    sendBtn.disabled = !inputEl.value.trim() && !pendingImage;
   }
   inputEl.addEventListener("input", autoGrow);
 

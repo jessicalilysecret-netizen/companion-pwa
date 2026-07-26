@@ -34,8 +34,16 @@
 
   <!-- 输入区 -->
   <footer id="composer">
-    <textarea id="input" rows="1" placeholder="说点什么…" enterkeyhint="send"></textarea>
-    <button id="btn-send" disabled>↑</button>
+    <div id="pending-image" hidden>
+      <img id="pending-thumb" alt="待发送图片">
+      <button id="btn-cancel-image" class="icon-btn" title="取消">✕</button>
+    </div>
+    <div id="composer-row">
+      <button id="btn-image" class="icon-btn" title="发图片">📷</button>
+      <input type="file" id="image-file" accept="image/*" hidden>
+      <textarea id="input" rows="1" placeholder="说点什么…" enterkeyhint="send"></textarea>
+      <button id="btn-send" disabled>↑</button>
+    </div>
   </footer>
 
   <!-- 传感器面板 -->
